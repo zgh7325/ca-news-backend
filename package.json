@@ -1,0 +1,23 @@
+{
+  "name": "ca-news-backend",
+  "version": "1.0.0",
+  "description": "Backend API for CA News iOS App",
+  "main": "backend-api-example.js",
+  "scripts": {
+    "start": "node backend-api-example.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "mongodb",
+    "express",
+    "api",
+    "cary-academy"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.22.1",
+    "mongodb": "^6.21.0"
+  }
+}
