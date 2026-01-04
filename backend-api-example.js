@@ -1002,8 +1002,12 @@ app.get('/api/result', async (req, res) => {
         let allResults = [];
         
         documents.forEach((doc) => {
+            // Log document structure for debugging
+            console.log(`📄 Document structure:`, JSON.stringify(Object.keys(doc), null, 2));
+            
             // Check if document has results array
             if (doc.results && Array.isArray(doc.results)) {
+                console.log(`   Found results array with ${doc.results.length} items`);
                 doc.results.forEach((resultItem, index) => {
                     let dateString = resultItem.date || new Date().toISOString();
                     
@@ -1052,6 +1056,7 @@ app.get('/api/result', async (req, res) => {
                 });
             } else {
                 // If document itself is a result (flat structure)
+                console.log(`   Checking flat structure - has event: ${!!doc.event}, has title: ${!!doc.title}, has sport: ${!!doc.sport}`);
                 if (doc.event || doc.title || doc.sport) {
                     let dateString = doc.date || new Date().toISOString();
                     try {
