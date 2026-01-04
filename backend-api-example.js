@@ -12,6 +12,7 @@ const COLLECTION_NAME = 'sports';
 const GENERAL_COLLECTION_NAME = 'general';
 const ROSTER_COLLECTION_NAME = 'roster';
 const ACADEMIC_COLLECTION_NAME = 'academic';
+const RESULT_COLLECTION_NAME = 'result';
 
 let db;
 let client;
@@ -984,6 +985,123 @@ app.get('/api/academic', async (req, res) => {
     }
 });
 
+// GET /api/result - Get all result events
+app.get('/api/result', async (req, res) => {
+    try {
+        if (!db) {
+            return res.status(503).json({ error: 'Database not connected' });
+        }
+        
+        const collection = db.collection(RESULT_COLLECTION_NAME);
+        const documents = await collection.find({}).toArray();
+        
+        console.log(`\n📥 GET /api/result`);
+        console.log(`   Collection: ${RESULT_COLLECTION_NAME}`);
+        console.log(`   Found ${documents.length} document(s)`);
+        
+        let allResults = [];
+        
+        documents.forEach((doc) => {
+            // Check if document has results array
+            if (doc.results && Array.isArray(doc.results)) {
+                doc.results.forEach((resultItem, index) => {
+                    let dateString = resultItem.date || new Date().toISOString();
+                    
+                    // Try to parse date
+                    try {
+                        const dateMatch = dateString.match(/^(\d{4}-\d{2}-\d{2})/);
+                        if (dateMatch) {
+                            const parsedDate = new Date(dateMatch[1]);
+                            if (!isNaN(parsedDate.getTime())) {
+                                dateString = parsedDate.toISOString();
+                            }
+                        } else {
+                            // Try MM-DD format
+                            const dateMatch2 = dateString.match(/^(\d{2}-\d{2})/);
+                            if (dateMatch2) {
+                                const currentYear = new Date().getFullYear();
+                                const [month, day] = dateMatch2[1].split('-');
+                                const dateWithYear = `${currentYear}-${month}-${day}`;
+                                const parsedDate = new Date(dateWithYear);
+                                if (!isNaN(parsedDate.getTime())) {
+                                    dateString = parsedDate.toISOString();
+                                }
+                            } else {
+                                const parsedDate = new Date(dateString);
+                                if (!isNaN(parsedDate.getTime())) {
+                                    dateString = parsedDate.toISOString();
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.log(`⚠️ Could not parse date: ${resultItem.date}, using current date`);
+                    }
+                    
+                    allResults.push({
+                        _id: doc._id.toString() + '_' + index,
+                        sport: resultItem.sport || null,
+                        season: resultItem.season || null,
+                        date: dateString,
+                        day: resultItem.day || null,
+                        event: resultItem.event || resultItem.title || 'Untitled Result',
+                        location: resultItem.location || null,
+                        opponent: resultItem.opponent || null,
+                        player: resultItem.player || null,
+                        result: resultItem.result || null
+                    });
+                });
+            } else {
+                // If document itself is a result (flat structure)
+                if (doc.event || doc.title || doc.sport) {
+                    let dateString = doc.date || new Date().toISOString();
+                    try {
+                        const parsedDate = new Date(dateString);
+                        if (!isNaN(parsedDate.getTime())) {
+                            dateString = parsedDate.toISOString();
+                        }
+                    } catch (error) {
+                        console.log(`⚠️ Could not parse date: ${doc.date}, using current date`);
+                    }
+                    
+                    allResults.push({
+                        _id: doc._id.toString(),
+                        sport: doc.sport || null,
+                        season: doc.season || null,
+                        date: dateString,
+                        day: doc.day || null,
+                        event: doc.event || doc.title || 'Untitled Result',
+                        location: doc.location || null,
+                        opponent: doc.opponent || null,
+                        player: doc.player || null,
+                        result: doc.result || null
+                    });
+                }
+            }
+        });
+        
+        console.log(`📊 Extracted ${allResults.length} results from ${documents.length} document(s)`);
+        
+        // Sort by date (descending - most recent first)
+        allResults.sort((a, b) => {
+            try {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateB - dateA; // Descending: most recent first
+            } catch (error) {
+                console.log(`⚠️ Could not parse date for sorting. Result A: ${a.event}, Result B: ${b.event}`);
+                return 0;
+            }
+        });
+        
+        console.log(`✅ Returning ${allResults.length} results to iOS app\n`);
+        
+        res.json(allResults);
+    } catch (error) {
+        console.error('❌ Error fetching results:', error);
+        res.status(500).json({ error: 'Failed to fetch results', details: error.message });
+    }
+});
+
 // Start server
 async function startServer() {
     await connectToMongoDB();
@@ -991,7 +1109,7 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
         const host = process.env.PORT ? 'production' : 'localhost';
         console.log(`🚀 Backend API server running on http://${host}:${PORT}`);
-        console.log(`📡 MongoDB: ${DATABASE_NAME}.${COLLECTION_NAME} & ${GENERAL_COLLECTION_NAME} & ${ROSTER_COLLECTION_NAME} & ${ACADEMIC_COLLECTION_NAME}`);
+        console.log(`📡 MongoDB: ${DATABASE_NAME}.${COLLECTION_NAME} & ${GENERAL_COLLECTION_NAME} & ${ROSTER_COLLECTION_NAME} & ${ACADEMIC_COLLECTION_NAME} & ${RESULT_COLLECTION_NAME}`);
         console.log(`\nAvailable endpoints:`);
         console.log(`  GET  /health - Health check`);
         console.log(`  GET  /api/sports - Get all sports events`);
@@ -1000,6 +1118,7 @@ async function startServer() {
         console.log(`  GET  /api/general - Get all general events`);
         console.log(`  GET  /api/academic - Get all academic events`);
         console.log(`  GET  /api/roster - Get team roster`);
+        console.log(`  GET  /api/result - Get all results`);
     });
 }
 
