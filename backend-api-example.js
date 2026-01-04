@@ -1005,8 +1005,58 @@ app.get('/api/result', async (req, res) => {
             // Log document structure for debugging
             console.log(`📄 Document structure:`, JSON.stringify(Object.keys(doc), null, 2));
             
-            // Check if document has results array
-            if (doc.results && Array.isArray(doc.results)) {
+            // Check if document has events array (primary structure)
+            if (doc.events && Array.isArray(doc.events)) {
+                console.log(`   Found events array with ${doc.events.length} items`);
+                doc.events.forEach((resultItem, index) => {
+                    let dateString = resultItem.date || new Date().toISOString();
+                    
+                    // Try to parse date
+                    try {
+                        const dateMatch = dateString.match(/^(\d{4}-\d{2}-\d{2})/);
+                        if (dateMatch) {
+                            const parsedDate = new Date(dateMatch[1]);
+                            if (!isNaN(parsedDate.getTime())) {
+                                dateString = parsedDate.toISOString();
+                            }
+                        } else {
+                            // Try MM-DD format
+                            const dateMatch2 = dateString.match(/^(\d{2}-\d{2})/);
+                            if (dateMatch2) {
+                                const currentYear = new Date().getFullYear();
+                                const [month, day] = dateMatch2[1].split('-');
+                                const dateWithYear = `${currentYear}-${month}-${day}`;
+                                const parsedDate = new Date(dateWithYear);
+                                if (!isNaN(parsedDate.getTime())) {
+                                    dateString = parsedDate.toISOString();
+                                }
+                            } else {
+                                const parsedDate = new Date(dateString);
+                                if (!isNaN(parsedDate.getTime())) {
+                                    dateString = parsedDate.toISOString();
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.log(`⚠️ Could not parse date: ${resultItem.date}, using current date`);
+                    }
+                    
+                    allResults.push({
+                        _id: doc._id.toString() + '_' + index,
+                        sport: resultItem.sport || null,
+                        season: resultItem.season || null,
+                        date: dateString,
+                        day: resultItem.day || null,
+                        event: resultItem.event || resultItem.title || 'Untitled Result',
+                        location: resultItem.location || null,
+                        opponent: resultItem.opponent || null,
+                        player: resultItem.player || null,
+                        result: resultItem.result || null,
+                        score: resultItem.score || null
+                    });
+                });
+            } else if (doc.results && Array.isArray(doc.results)) {
+                // Fallback: Check if document has results array (alternative structure)
                 console.log(`   Found results array with ${doc.results.length} items`);
                 doc.results.forEach((resultItem, index) => {
                     let dateString = resultItem.date || new Date().toISOString();
@@ -1051,7 +1101,8 @@ app.get('/api/result', async (req, res) => {
                         location: resultItem.location || null,
                         opponent: resultItem.opponent || null,
                         player: resultItem.player || null,
-                        result: resultItem.result || null
+                        result: resultItem.result || null,
+                        score: resultItem.score || null
                     });
                 });
             } else {
@@ -1078,7 +1129,8 @@ app.get('/api/result', async (req, res) => {
                         location: doc.location || null,
                         opponent: doc.opponent || null,
                         player: doc.player || null,
-                        result: doc.result || null
+                        result: doc.result || null,
+                        score: doc.score || null
                     });
                 }
             }
