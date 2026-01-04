@@ -826,12 +826,46 @@ app.get('/api/academic', async (req, res) => {
             console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
         }
         
-        // Extract events from documents (similar to general events structure)
+        // Extract events from documents
         let allEvents = [];
         
         documents.forEach((doc) => {
+            // Check if document has events array (academic collection structure)
+            if (doc.events && Array.isArray(doc.events)) {
+                doc.events.forEach((eventItem, index) => {
+                    // Academic events have: event, date, day, location, Category
+                    let dateString = eventItem.date || new Date().toISOString();
+                    
+                    // Try to parse date (format: "2026-01-16 to 01-18" or "2026-01-16")
+                    try {
+                        // Extract first date if range (e.g., "2026-01-16 to 01-18" -> "2026-01-16")
+                        const dateMatch = dateString.match(/^(\d{4}-\d{2}-\d{2})/);
+                        if (dateMatch) {
+                            const parsedDate = new Date(dateMatch[1]);
+                            if (!isNaN(parsedDate.getTime())) {
+                                dateString = parsedDate.toISOString();
+                            }
+                        } else {
+                            // Try parsing as-is
+                            const parsedDate = new Date(dateString);
+                            if (!isNaN(parsedDate.getTime())) {
+                                dateString = parsedDate.toISOString();
+                            }
+                        }
+                    } catch (error) {
+                        console.log(`⚠️ Could not parse date: ${eventItem.date}, using current date`);
+                    }
+                    
+                    allEvents.push({
+                        _id: doc._id.toString() + '_' + index,
+                        title: eventItem.event || eventItem.title || eventItem.name || 'Untitled Event',
+                        date: dateString,
+                        link: eventItem.link || eventItem.url || eventItem.href || null
+                    });
+                });
+            }
             // Check if document has articles array
-            if (doc.articles && Array.isArray(doc.articles)) {
+            else if (doc.articles && Array.isArray(doc.articles)) {
                 doc.articles.forEach((article, index) => {
                     let dateString = article.date || new Date().toISOString();
                     try {
