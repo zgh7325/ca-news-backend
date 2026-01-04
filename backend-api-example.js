@@ -836,20 +836,58 @@ app.get('/api/academic', async (req, res) => {
                     // Academic events have: event, date, day, location, Category
                     let dateString = eventItem.date || new Date().toISOString();
                     
-                    // Try to parse date (format: "2026-01-16 to 01-18" or "2026-01-16")
+                    // Try to parse date (formats: "2026-01-16 to 01-18", "02-14 to 02-16", "2026-01-16", etc.)
                     try {
-                        // Extract first date if range (e.g., "2026-01-16 to 01-18" -> "2026-01-16")
-                        const dateMatch = dateString.match(/^(\d{4}-\d{2}-\d{2})/);
+                        // First, try to extract date from range formats
+                        // Format 1: "2026-01-16 to 01-18" or "2026-01-16 to 2026-01-18"
+                        let dateMatch = dateString.match(/^(\d{4}-\d{2}-\d{2})/);
                         if (dateMatch) {
                             const parsedDate = new Date(dateMatch[1]);
                             if (!isNaN(parsedDate.getTime())) {
                                 dateString = parsedDate.toISOString();
                             }
                         } else {
-                            // Try parsing as-is
-                            const parsedDate = new Date(dateString);
-                            if (!isNaN(parsedDate.getTime())) {
-                                dateString = parsedDate.toISOString();
+                            // Format 2: "02-14 to 02-16" or "01-23 to 01-25" (MM-DD format, assume current year)
+                            dateMatch = dateString.match(/^(\d{2}-\d{2})/);
+                            if (dateMatch) {
+                                const currentYear = new Date().getFullYear();
+                                const [month, day] = dateMatch[1].split('-');
+                                const dateWithYear = `${currentYear}-${month}-${day}`;
+                                const parsedDate = new Date(dateWithYear);
+                                
+                                // Check if date is in the past (more than 30 days ago), then use next year
+                                const now = new Date();
+                                const daysDiff = (parsedDate - now) / (1000 * 60 * 60 * 24);
+                                
+                                if (!isNaN(parsedDate.getTime())) {
+                                    if (daysDiff < -30) {
+                                        // Date is more than 30 days in the past, assume next year
+                                        const nextYear = currentYear + 1;
+                                        const dateWithNextYear = `${nextYear}-${month}-${day}`;
+                                        const parsedDateNextYear = new Date(dateWithNextYear);
+                                        if (!isNaN(parsedDateNextYear.getTime())) {
+                                            dateString = parsedDateNextYear.toISOString();
+                                        } else {
+                                            dateString = parsedDate.toISOString();
+                                        }
+                                    } else {
+                                        dateString = parsedDate.toISOString();
+                                    }
+                                } else {
+                                    // Invalid date, try next year
+                                    const nextYear = currentYear + 1;
+                                    const dateWithNextYear = `${nextYear}-${month}-${day}`;
+                                    const parsedDateNextYear = new Date(dateWithNextYear);
+                                    if (!isNaN(parsedDateNextYear.getTime())) {
+                                        dateString = parsedDateNextYear.toISOString();
+                                    }
+                                }
+                            } else {
+                                // Try parsing as-is
+                                const parsedDate = new Date(dateString);
+                                if (!isNaN(parsedDate.getTime())) {
+                                    dateString = parsedDate.toISOString();
+                                }
                             }
                         }
                     } catch (error) {
