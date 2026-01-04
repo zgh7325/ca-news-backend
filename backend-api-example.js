@@ -860,6 +860,10 @@ app.get('/api/academic', async (req, res) => {
                         _id: doc._id.toString() + '_' + index,
                         title: eventItem.event || eventItem.title || eventItem.name || 'Untitled Event',
                         date: dateString,
+                        dateRange: eventItem.date || null, // Original date range string
+                        dayRange: eventItem.day || null, // Day range (e.g., "Friday to Sunday")
+                        location: eventItem.location || null,
+                        category: eventItem.Category || eventItem.category || null,
                         link: eventItem.link || eventItem.url || eventItem.href || null
                     });
                 });
