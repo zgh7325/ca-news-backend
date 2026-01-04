@@ -11,6 +11,7 @@ const DATABASE_NAME = 'canews';
 const COLLECTION_NAME = 'sports';
 const GENERAL_COLLECTION_NAME = 'general';
 const ROSTER_COLLECTION_NAME = 'roster';
+const ACADEMIC_COLLECTION_NAME = 'academic';
 
 let db;
 let client;
@@ -19,15 +20,31 @@ let client;
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
+// Connect to MongoDB with retry logic
 async function connectToMongoDB() {
-    try {
-        client = new MongoClient(MONGODB_URI);
-        await client.connect();
-        db = client.db(DATABASE_NAME);
-        console.log('✅ Connected to MongoDB successfully');
-    } catch (error) {
-        console.error('❌ MongoDB connection error:', error);
+    const maxRetries = 5;
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+        try {
+            if (client) {
+                await client.close();
+            }
+            client = new MongoClient(MONGODB_URI);
+            await client.connect();
+            db = client.db(DATABASE_NAME);
+            console.log('✅ Connected to MongoDB successfully');
+            return; // Success, exit function
+        } catch (error) {
+            retries++;
+            console.error(`❌ MongoDB connection error (attempt ${retries}/${maxRetries}):`, error.message);
+            if (retries < maxRetries) {
+                console.log(`⏳ Retrying in 3 seconds...`);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            } else {
+                console.error('❌ Failed to connect to MongoDB after', maxRetries, 'attempts');
+            }
+        }
     }
 }
 
@@ -780,6 +797,117 @@ app.get('/api/roster', async (req, res) => {
     }
 });
 
+// Get all academic events
+app.get('/api/academic', async (req, res) => {
+    try {
+        if (!db) {
+            return res.status(503).json({ error: 'Database not connected' });
+        }
+
+        const collection = db.collection(ACADEMIC_COLLECTION_NAME);
+        
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📥 FETCHING ACADEMIC EVENTS FROM MONGODB:');
+        console.log(`   Database: ${DATABASE_NAME}`);
+        console.log(`   Collection: ${ACADEMIC_COLLECTION_NAME}`);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+        
+        // Fetch ALL documents with no filter
+        const documents = await collection.find({}).toArray();
+        
+        console.log(`📊 Raw count from MongoDB: ${documents.length} documents`);
+        
+        // Log document structure for debugging
+        if (documents.length > 0) {
+            console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('📋 DOCUMENT STRUCTURE (First Document):');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log(JSON.stringify(documents[0], null, 2));
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+        }
+        
+        // Extract events from documents (similar to general events structure)
+        let allEvents = [];
+        
+        documents.forEach((doc) => {
+            // Check if document has articles array
+            if (doc.articles && Array.isArray(doc.articles)) {
+                doc.articles.forEach((article, index) => {
+                    let dateString = article.date || new Date().toISOString();
+                    try {
+                        const date = new Date(article.date);
+                        if (!isNaN(date.getTime())) {
+                            dateString = date.toISOString();
+                        }
+                    } catch (error) {
+                        console.log(`⚠️ Could not parse date: ${article.date}, using current date`);
+                    }
+                    
+                    allEvents.push({
+                        _id: doc._id.toString() + '_' + index,
+                        title: article.title || 'Untitled Event',
+                        date: dateString,
+                        link: article.link || article.url || article.href || null
+                    });
+                });
+            }
+            // Check if document has upcoming_events array
+            else if (doc.upcoming_events && Array.isArray(doc.upcoming_events)) {
+                doc.upcoming_events.forEach((dateGroup) => {
+                    if (dateGroup.events && Array.isArray(dateGroup.events)) {
+                        dateGroup.events.forEach((event) => {
+                            allEvents.push({
+                                _id: doc._id.toString() + '_' + allEvents.length,
+                                title: event.title || event.event || event.event_name || event.eventName || event.name || 'Untitled Event',
+                                date: dateGroup.date || event.date || new Date().toISOString(),
+                                link: event.link || event.url || event.href || null
+                            });
+                        });
+                    } else {
+                        allEvents.push({
+                            _id: doc._id.toString() + '_' + allEvents.length,
+                            title: dateGroup.title || dateGroup.event || dateGroup.event_name || dateGroup.eventName || dateGroup.name || 'Untitled Event',
+                            date: dateGroup.date || new Date().toISOString(),
+                            link: dateGroup.link || dateGroup.url || dateGroup.href || null
+                        });
+                    }
+                });
+            } else {
+                // If document itself is an event (flat structure)
+                if (doc.title || doc.name || doc.event || doc.event_name) {
+                    allEvents.push({
+                        _id: doc._id.toString(),
+                        title: doc.title || doc.name || doc.event || doc.event_name || 'Untitled Event',
+                        date: doc.date || new Date().toISOString(),
+                        link: doc.link || doc.url || doc.href || null
+                    });
+                }
+            }
+        });
+        
+        console.log(`📊 Extracted ${allEvents.length} academic events from ${documents.length} document(s)`);
+        
+        // Sort by date (descending - most recent first, including past events)
+        allEvents.sort((a, b) => {
+            try {
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateB - dateA; // Descending: most recent first
+            } catch (error) {
+                console.log(`⚠️ Could not parse date for sorting. Event A: ${a.title}, Event B: ${b.title}`);
+                return 0;
+            }
+        });
+        
+        console.log(`✅ Returning ${allEvents.length} academic events (including past events) to iOS app\n`);
+        
+        res.json(allEvents);
+    } catch (error) {
+        console.error('❌ Error fetching academic events:', error);
+        res.status(500).json({ error: 'Failed to fetch academic events', details: error.message });
+    }
+});
+
 // Start server
 async function startServer() {
     await connectToMongoDB();
@@ -787,13 +915,14 @@ async function startServer() {
     app.listen(PORT, '0.0.0.0', () => {
         const host = process.env.PORT ? 'production' : 'localhost';
         console.log(`🚀 Backend API server running on http://${host}:${PORT}`);
-        console.log(`📡 MongoDB: ${DATABASE_NAME}.${COLLECTION_NAME} & ${GENERAL_COLLECTION_NAME} & ${ROSTER_COLLECTION_NAME}`);
+        console.log(`📡 MongoDB: ${DATABASE_NAME}.${COLLECTION_NAME} & ${GENERAL_COLLECTION_NAME} & ${ROSTER_COLLECTION_NAME} & ${ACADEMIC_COLLECTION_NAME}`);
         console.log(`\nAvailable endpoints:`);
         console.log(`  GET  /health - Health check`);
         console.log(`  GET  /api/sports - Get all sports events`);
         console.log(`  GET  /api/sports/:id - Get sports event by ID`);
         console.log(`  POST /api/sports - Create new sports event`);
         console.log(`  GET  /api/general - Get all general events`);
+        console.log(`  GET  /api/academic - Get all academic events`);
         console.log(`  GET  /api/roster - Get team roster`);
     });
 }
