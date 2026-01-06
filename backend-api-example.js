@@ -609,10 +609,15 @@ app.get('/api/roster', async (req, res) => {
                     
                     console.log(`      ${coaches.length} coaches, ${players.length} players`);
                     
-                    // Group by sport
-                    if (!rosterBySport[sportName]) {
-                        rosterBySport[sportName] = {
+                    // Extract season from document or team
+                    const season = doc.season || team.season || null;
+                    
+                    // Group by sport and season (create unique key)
+                    const rosterKey = season ? `${sportName}|||${season}` : sportName;
+                    if (!rosterBySport[rosterKey]) {
+                        rosterBySport[rosterKey] = {
                             sport: sportName,
+                            season: season,
                             coaches: [],
                             players: []
                         };
@@ -689,23 +694,29 @@ app.get('/api/roster', async (req, res) => {
                     
                     console.log(`      ${coaches.length} coaches, ${players.length} players`);
                     
-                    // Group by sport
-                    if (!rosterBySport[sport]) {
-                        rosterBySport[sport] = {
+                    // Extract season from document or team
+                    const season = doc.season || team.season || null;
+                    
+                    // Group by sport and season (create unique key)
+                    const rosterKey = season ? `${sport}|||${season}` : sport;
+                    if (!rosterBySport[rosterKey]) {
+                        rosterBySport[rosterKey] = {
                             sport: sport,
+                            season: season,
                             coaches: [],
                             players: []
                         };
                     }
                     
                     // Add coaches and players
-                    rosterBySport[sport].coaches.push(...coaches);
-                    rosterBySport[sport].players.push(...players);
+                    rosterBySport[rosterKey].coaches.push(...coaches);
+                    rosterBySport[rosterKey].players.push(...players);
                 });
             } else {
                 // Handle flat document structure
                 const sport = doc.sport || doc.sport_name || doc.sportName || doc.name || doc.title || 'Unknown Sport';
-                console.log(`   Sport: ${sport}`);
+                const season = doc.season || null;
+                console.log(`   Sport: ${sport}, Season: ${season || 'N/A'}`);
                 
                 // Extract coaches
                 let coaches = [];
@@ -767,18 +778,20 @@ app.get('/api/roster', async (req, res) => {
                 
                 console.log(`   Found ${coaches.length} coaches, ${players.length} players`);
                 
-                // Group by sport
-                if (!rosterBySport[sport]) {
-                    rosterBySport[sport] = {
+                // Group by sport and season (create unique key) - season already extracted above
+                const rosterKey = season ? `${sport}|||${season}` : sport;
+                if (!rosterBySport[rosterKey]) {
+                    rosterBySport[rosterKey] = {
                         sport: sport,
+                        season: season,
                         coaches: [],
                         players: []
                     };
                 }
                 
                 // Add coaches and players
-                rosterBySport[sport].coaches.push(...coaches);
-                rosterBySport[sport].players.push(...players);
+                rosterBySport[rosterKey].coaches.push(...coaches);
+                rosterBySport[rosterKey].players.push(...players);
             }
         });
         
