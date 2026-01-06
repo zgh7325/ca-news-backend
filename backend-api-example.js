@@ -636,8 +636,8 @@ app.get('/api/roster', async (req, res) => {
                     }
                     
                     // Add coaches and players
-                    rosterBySport[sportName].coaches.push(...coaches);
-                    rosterBySport[sportName].players.push(...players);
+                    rosterBySport[rosterKey].coaches.push(...coaches);
+                    rosterBySport[rosterKey].players.push(...players);
                 });
             } else if (doc.teams && Array.isArray(doc.teams)) {
                 // Handle teams as array
@@ -813,8 +813,9 @@ app.get('/api/roster', async (req, res) => {
         // Convert to array format
         const rosterArray = Object.values(rosterBySport).map(team => ({
             sport: team.sport,
-            coaches: team.coaches,
-            players: team.players
+            season: team.season || null,
+            coaches: team.coaches || [],
+            players: team.players || []
         }));
         
         console.log(`✅ Returning ${rosterArray.length} sports with roster data\n`);
