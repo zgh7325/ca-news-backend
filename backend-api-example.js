@@ -181,13 +181,19 @@ app.get('/api/sports', async (req, res) => {
             console.log('');
         });
         
-        // Extract events ONLY from the upcoming_events array
-        // MongoDB document structure: { upcoming_events: [{ date, day, events: [...] }] }
+        // Extract events from ALL documents, checking multiple possible structures
+        // MongoDB document structures:
+        // 1. { upcoming_events: [{ date, day, events: [...] }] }
+        // 2. { events: [...] }
+        // 3. Flat structure with event fields directly
         let allEvents = [];
         
-        documents.forEach((doc) => {
-            // ONLY process documents that have upcoming_events array
+        documents.forEach((doc, docIndex) => {
+            console.log(`\n📄 Processing Document ${docIndex + 1}/${documents.length} (ID: ${doc._id})`);
+            
+            // Check for upcoming_events array (primary structure)
             if (doc.upcoming_events && Array.isArray(doc.upcoming_events)) {
+                console.log(`   ✅ Found upcoming_events array with ${doc.upcoming_events.length} date groups`);
                 // Each item in upcoming_events has: { date, day, events: [...] }
                 doc.upcoming_events.forEach((dateGroup, dgIndex) => {
                     const dateGroupKeys = Object.keys(dateGroup);
@@ -288,7 +294,57 @@ app.get('/api/sports', async (req, res) => {
                     }
                 });
             }
-            // Removed fallback - only show events from upcoming_events array
+            // Check for alternative structures if no upcoming_events array
+            else if (doc.events && Array.isArray(doc.events)) {
+                console.log(`   ✅ Found 'events' array with ${doc.events.length} items`);
+                doc.events.forEach((event, index) => {
+                    const location = event.venue || event.location || null;
+                    const season = doc.season || event.season || doc.Season || event.Season || 
+                                  doc.season_name || event.season_name || doc.seasonName || event.seasonName ||
+                                  doc.year || event.year || null;
+                    
+                    allEvents.push({
+                        _id: doc._id.toString() + '_events_' + index,
+                        title: event.event || event.event_name || event.eventName || event.title || 'Untitled Event',
+                        content: '',
+                        sport: event.sport || 'General',
+                        opponent: event.opponent || null,
+                        date: event.date || doc.date || new Date().toISOString(),
+                        time: event.time || null,
+                        location: location,
+                        venue: null,
+                        author: null,
+                        imageName: null,
+                        team: event.team || null,
+                        season: season
+                    });
+                });
+            }
+            // Check if document itself is a flat event structure
+            else if (doc.event || doc.event_name || doc.eventName || (doc.sport && doc.date)) {
+                console.log(`   ✅ Found flat event structure`);
+                const location = doc.venue || doc.location || null;
+                const season = doc.season || doc.Season || doc.season_name || doc.seasonName || doc.year || null;
+                
+                allEvents.push({
+                    _id: doc._id.toString(),
+                    title: doc.event || doc.event_name || doc.eventName || doc.title || 'Untitled Event',
+                    content: '',
+                    sport: doc.sport || 'General',
+                    opponent: doc.opponent || null,
+                    date: doc.date || new Date().toISOString(),
+                    time: doc.time || null,
+                    location: location,
+                    venue: null,
+                    author: null,
+                    imageName: null,
+                    team: doc.team || null,
+                    season: season
+                });
+            } else {
+                console.log(`   ⚠️ Document ${docIndex + 1} has no recognizable event structure`);
+                console.log(`      Document keys: ${Object.keys(doc).join(', ')}`);
+            }
         });
         
         console.log(`📊 Extracted ${allEvents.length} individual events from ${documents.length} document(s)`);
