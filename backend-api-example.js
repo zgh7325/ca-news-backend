@@ -537,6 +537,10 @@ app.get('/api/roster', async (req, res) => {
                 teamKeys.forEach((sportName, teamIndex) => {
                     const team = doc.teams[sportName];
                     console.log(`   Team ${teamIndex + 1}: ${sportName}`);
+                    console.log(`   Document keys: ${Object.keys(doc).join(', ')}`);
+                    console.log(`   Team keys: ${Object.keys(team).join(', ')}`);
+                    console.log(`   Document season: ${doc.season || 'N/A'}`);
+                    console.log(`   Team season: ${team.season || 'N/A'}`);
                     
                     // Extract coaches from team
                     let coaches = [];
@@ -609,8 +613,16 @@ app.get('/api/roster', async (req, res) => {
                     
                     console.log(`      ${coaches.length} coaches, ${players.length} players`);
                     
-                    // Extract season from document or team
-                    const season = doc.season || team.season || null;
+                    // Extract season from document or team (try multiple possible field names)
+                    const season = doc.season || team.season || doc.Season || team.Season || 
+                                   doc.season_name || team.season_name || doc.seasonName || team.seasonName ||
+                                   doc.year || team.year || null;
+                    
+                    if (season) {
+                        console.log(`   ✅ Found season: ${season}`);
+                    } else {
+                        console.log(`   ⚠️ No season found for team: ${sportName}`);
+                    }
                     
                     // Group by sport and season (create unique key)
                     const rosterKey = season ? `${sportName}|||${season}` : sportName;
@@ -715,8 +727,11 @@ app.get('/api/roster', async (req, res) => {
             } else {
                 // Handle flat document structure
                 const sport = doc.sport || doc.sport_name || doc.sportName || doc.name || doc.title || 'Unknown Sport';
-                const season = doc.season || null;
+                // Try multiple possible field names for season
+                const season = doc.season || doc.Season || doc.season_name || doc.seasonName || 
+                              doc.year || null;
                 console.log(`   Sport: ${sport}, Season: ${season || 'N/A'}`);
+                console.log(`   Document keys: ${Object.keys(doc).join(', ')}`);
                 
                 // Extract coaches
                 let coaches = [];
