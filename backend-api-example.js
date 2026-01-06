@@ -187,6 +187,14 @@ app.get('/api/sports', async (req, res) => {
                                       doc.season_name || dateGroup.season_name || doc.seasonName || dateGroup.seasonName ||
                                       doc.year || dateGroup.year || null;
                         
+                        if (season) {
+                            console.log(`   ✅ Found season: ${season} for event: ${dateGroup.event || dateGroup.event_name || 'Untitled'}`);
+                        } else {
+                            console.log(`   ⚠️ No season found for event: ${dateGroup.event || dateGroup.event_name || 'Untitled'}`);
+                            console.log(`      Document season fields: doc.season=${doc.season}, doc.Season=${doc.Season}, doc.season_name=${doc.season_name}`);
+                            console.log(`      DateGroup season fields: dateGroup.season=${dateGroup.season}, dateGroup.Season=${dateGroup.Season}`);
+                        }
+                        
                         allEvents.push({
                             _id: doc._id.toString() + '_' + allEvents.length,
                             title: dateGroup.event || dateGroup.event_name || dateGroup.eventName || 'Untitled Event',
@@ -211,6 +219,11 @@ app.get('/api/sports', async (req, res) => {
                         
                         dateGroup.events.forEach((event) => {
                             const location = event.venue || event.location || null;
+                            const eventSeason = event.season || season || null;
+                            
+                            if (eventSeason) {
+                                console.log(`   ✅ Found season: ${eventSeason} for event: ${event.event || event.event_name || 'Untitled'}`);
+                            }
                             
                             allEvents.push({
                                 _id: doc._id.toString() + '_' + allEvents.length,
@@ -225,7 +238,7 @@ app.get('/api/sports', async (req, res) => {
                                 author: null,
                                 imageName: null,
                                 team: event.team || null,
-                                season: event.season || season || null
+                                season: eventSeason
                             });
                         });
                     }
@@ -268,7 +281,8 @@ app.get('/api/sports', async (req, res) => {
                 venue: event.venue || null,
                 author: event.author || null,
                 imageName: event.imageName || null,
-                team: event.team || null
+                team: event.team || null,
+                season: event.season || null
             };
             
             console.log(`[Formatted Event ${index + 1} of ${allEvents.length}]`);
@@ -278,35 +292,31 @@ app.get('/api/sports', async (req, res) => {
             return formatted;
         });
 
-        // Filter to show only future events (including today)
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
+        // Return ALL events (no date filtering) - let iOS app handle filtering if needed
+        console.log(`📅 Total events extracted: ${formattedEvents.length}`);
         
-        const futureEvents = formattedEvents.filter(event => {
+        // Log season information for debugging
+        const eventsWithSeason = formattedEvents.filter(e => e.season).length;
+        const uniqueSeasons = [...new Set(formattedEvents.map(e => e.season).filter(s => s))];
+        console.log(`📊 Events with season: ${eventsWithSeason} of ${formattedEvents.length}`);
+        console.log(`📊 Unique seasons found: ${uniqueSeasons.join(', ') || 'NONE'}`);
+        
+        // Sort by date (ascending - earliest dates first)
+        formattedEvents.sort((a, b) => {
             try {
-                const eventDate = new Date(event.date);
-                const eventDay = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-                return eventDay >= today; // Include today's events
+                const dateA = new Date(a.date);
+                const dateB = new Date(b.date);
+                return dateA - dateB; // Ascending: earliest dates first
             } catch (error) {
-                console.log(`⚠️ Could not parse date for event: ${event.title}, date: ${event.date}`);
-                return false; // Exclude events with invalid dates
+                return 0;
             }
-        });
-        
-        console.log(`📅 Filtered events: ${formattedEvents.length} total, ${futureEvents.length} future events`);
-        
-        // Sort by date (most recent/closest to today first - ascending)
-        futureEvents.sort((a, b) => {
-            const dateA = new Date(a.date);
-            const dateB = new Date(b.date);
-            return dateA - dateB; // Ascending: earliest dates first (most recent upcoming events)
         });
 
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log(`✅ Returning ${futureEvents.length} future sports events to iOS app`);
+        console.log(`✅ Returning ${formattedEvents.length} sports events (ALL events, no date filter) to iOS app`);
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
         
-        res.json(futureEvents);
+        res.json(formattedEvents);
     } catch (error) {
         console.error('❌ Error fetching sports events:', error);
         res.status(500).json({ error: 'Failed to fetch sports events', details: error.message });
