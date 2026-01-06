@@ -182,6 +182,11 @@ app.get('/api/sports', async (req, res) => {
                             }
                         }
                         
+                        // Extract season from document or dateGroup
+                        const season = doc.season || dateGroup.season || doc.Season || dateGroup.Season || 
+                                      doc.season_name || dateGroup.season_name || doc.seasonName || dateGroup.seasonName ||
+                                      doc.year || dateGroup.year || null;
+                        
                         allEvents.push({
                             _id: doc._id.toString() + '_' + allEvents.length,
                             title: dateGroup.event || dateGroup.event_name || dateGroup.eventName || 'Untitled Event',
@@ -194,10 +199,16 @@ app.get('/api/sports', async (req, res) => {
                             venue: null,
                             author: null,
                             imageName: null,
-                            team: team
+                            team: team,
+                            season: season
                         });
                     } else if (dateGroup.events && Array.isArray(dateGroup.events)) {
                         // Traditional structure: dateGroup has events array
+                        // Extract season from document or dateGroup
+                        const season = doc.season || dateGroup.season || doc.Season || dateGroup.Season || 
+                                      doc.season_name || dateGroup.season_name || doc.seasonName || dateGroup.seasonName ||
+                                      doc.year || dateGroup.year || null;
+                        
                         dateGroup.events.forEach((event) => {
                             const location = event.venue || event.location || null;
                             
@@ -213,7 +224,8 @@ app.get('/api/sports', async (req, res) => {
                                 venue: null,
                                 author: null,
                                 imageName: null,
-                                team: event.team || null
+                                team: event.team || null,
+                                season: event.season || season || null
                             });
                         });
                     }
