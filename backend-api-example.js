@@ -75,6 +75,28 @@ app.get('/api/sports', async (req, res) => {
         console.log(`🔍 Query: find({}) - No filters applied`);
         console.log(`📊 Raw count from MongoDB: ${documents.length} documents`);
         
+        // Log all document IDs and their structures
+        console.log(`\n📋 All Documents Summary:`);
+        documents.forEach((doc, idx) => {
+            console.log(`   Document ${idx + 1}: _id=${doc._id}`);
+            console.log(`      Has upcoming_events: ${Array.isArray(doc.upcoming_events)}`);
+            if (Array.isArray(doc.upcoming_events)) {
+                const dates = doc.upcoming_events.map(dg => dg.date).filter(Boolean);
+                const uniqueMonths = new Set(dates.map(d => {
+                    try {
+                        return d.substring(0, 7); // YYYY-MM
+                    } catch (e) {
+                        return null;
+                    }
+                }).filter(Boolean));
+                console.log(`      Months in upcoming_events: ${Array.from(uniqueMonths).sort().join(', ') || 'NONE'}`);
+                console.log(`      Total date groups: ${doc.upcoming_events.length}`);
+            }
+            const allKeys = Object.keys(doc);
+            console.log(`      All keys: ${allKeys.join(', ')}`);
+        });
+        console.log('');
+        
         console.log(`✅ Found ${documents.length} documents in MongoDB`);
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('📋 RAW MONGODB DOCUMENTS (Before Processing):');
