@@ -97,6 +97,8 @@ app.get('/api/sports', async (req, res) => {
             if (Array.isArray(doc.upcoming_events)) {
                 console.log(`   Number of date groups in upcoming_events: ${doc.upcoming_events.length}`);
                 let totalEventsInDoc = 0;
+                const datesInDoc = new Set();
+                
                 doc.upcoming_events.forEach((dateGroup, dgIndex) => {
                     // Check if events is an array
                     const eventsInGroup = dateGroup.events ? dateGroup.events.length : 0;
@@ -110,9 +112,15 @@ app.get('/api/sports', async (req, res) => {
                     if (hasEventFields && !dateGroup.events) {
                         console.log(`   Date Group ${dgIndex + 1} (${dateGroup.date}): IS AN EVENT OBJECT (not array)`);
                         totalEventsInDoc += 1;
+                        if (dateGroup.date) {
+                            datesInDoc.add(dateGroup.date);
+                        }
                     } else {
                         console.log(`   Date Group ${dgIndex + 1} (${dateGroup.date}): ${eventsInGroup} events in array`);
                         totalEventsInDoc += eventsInGroup;
+                        if (dateGroup.date) {
+                            datesInDoc.add(dateGroup.date);
+                        }
                     }
                     
                     // Show structure of first few date groups
@@ -121,7 +129,21 @@ app.get('/api/sports', async (req, res) => {
                         console.log(`   Date Group ${dgIndex + 1} sample:`, JSON.stringify(dateGroup, null, 2).substring(0, 400));
                     }
                 });
+                
+                // Log unique dates in this document
+                const sortedDates = Array.from(datesInDoc).sort();
+                const monthsInDoc = new Set();
+                sortedDates.forEach(date => {
+                    try {
+                        const dateObj = new Date(date);
+                        const month = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                        monthsInDoc.add(month);
+                    } catch (e) {}
+                });
+                
                 console.log(`   TOTAL events in this document: ${totalEventsInDoc}`);
+                console.log(`   Unique dates in this document: ${sortedDates.length} (${sortedDates.slice(0, 5).join(', ')}${sortedDates.length > 5 ? '...' : ''})`);
+                console.log(`   Months in this document: ${Array.from(monthsInDoc).sort().join(', ')}`);
             } else {
                 // Check for other possible event structures
                 console.log(`   Checking for alternative event structures...`);
@@ -248,18 +270,44 @@ app.get('/api/sports', async (req, res) => {
         });
         
         console.log(`📊 Extracted ${allEvents.length} individual events from ${documents.length} document(s)`);
-        console.log(`📋 Events by date:`);
+        console.log(`📋 Events by date (showing all months):`);
         const eventsByDate = {};
+        const eventsByMonth = {};
         allEvents.forEach(event => {
             const date = event.date;
             if (!eventsByDate[date]) {
                 eventsByDate[date] = [];
             }
             eventsByDate[date].push(event.title);
+            
+            // Group by month for easier viewing
+            try {
+                const dateObj = new Date(date);
+                const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                if (!eventsByMonth[monthKey]) {
+                    eventsByMonth[monthKey] = 0;
+                }
+                eventsByMonth[monthKey]++;
+            } catch (e) {
+                // Ignore date parsing errors
+            }
         });
-        Object.keys(eventsByDate).sort().forEach(date => {
-            console.log(`   ${date}: ${eventsByDate[date].length} event(s) - ${eventsByDate[date].join(', ')}`);
+        
+        // Log events by month
+        console.log(`\n📅 Events by month:`);
+        Object.keys(eventsByMonth).sort().forEach(month => {
+            console.log(`   ${month}: ${eventsByMonth[month]} event(s)`);
         });
+        
+        // Log events by date (first 50 dates)
+        console.log(`\n📅 Events by date (first 50 dates):`);
+        const sortedDates = Object.keys(eventsByDate).sort();
+        sortedDates.slice(0, 50).forEach(date => {
+            console.log(`   ${date}: ${eventsByDate[date].length} event(s) - ${eventsByDate[date].slice(0, 3).join(', ')}${eventsByDate[date].length > 3 ? '...' : ''}`);
+        });
+        if (sortedDates.length > 50) {
+            console.log(`   ... and ${sortedDates.length - 50} more dates`);
+        }
         console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log('📤 FORMATTED EVENTS (After Processing):');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
