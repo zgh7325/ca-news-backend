@@ -208,24 +208,27 @@ app.get('/api/sports', async (req, res) => {
                         // DateGroup IS the event object itself (MongoDB structure)
                         const location = dateGroup.venue || dateGroup.location || null;
                         
-                        // Extract sport and team from event string (e.g., "Basketball (JV Boys)")
+                        // Use exact team value from MongoDB - don't parse from event string
+                        const team = dateGroup.team || null;
+                        
+                        // Extract sport from MongoDB field or parse from event string if needed
                         let sport = dateGroup.sport || 'General';
-                        let team = dateGroup.team || null;
                         const eventString = dateGroup.event || '';
                         
-                        // Parse event string to extract sport and team if not already present
+                        // Only parse sport from event string if sport is not already present in MongoDB
+                        // Do NOT parse team from event string - always use MongoDB team field
                         if (eventString && !dateGroup.sport) {
                             // Event format: "Basketball (JV Boys)" or "Basketball - Varsity Girls"
                             const match = eventString.match(/^([^(]+)\s*\(([^)]+)\)/);
                             if (match) {
                                 sport = match[1].trim();
-                                team = match[2].trim();
+                                // Don't overwrite team - use MongoDB team field only
                             } else {
                                 // Try alternative format
                                 const parts = eventString.split('-');
                                 if (parts.length >= 2) {
                                     sport = parts[0].trim();
-                                    team = parts[1].trim();
+                                    // Don't overwrite team - use MongoDB team field only
                                 } else {
                                     sport = eventString.trim();
                                 }
