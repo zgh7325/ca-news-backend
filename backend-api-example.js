@@ -54,6 +54,53 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Backend API is running' });
 });
 
+// Normalize team names to remove duplicates and fix inconsistencies
+function normalizeTeamName(team) {
+    if (!team) return null;
+    
+    // Remove extra whitespace
+    let normalized = team.trim();
+    
+    // Fix common typos first
+    normalized = normalized.replace(/Backetball/gi, 'Basketball');
+    normalized = normalized.replace(/Varsit/gi, 'Varsity');
+    normalized = normalized.replace(/Reschedule/gi, 'Rescheduled');
+    
+    // Remove common suffixes that create duplicates (like "- Rescheduled from...")
+    normalized = normalized.replace(/\s*-\s*Rescheduled.*$/i, '');
+    normalized = normalized.replace(/\s*-\s*Dash Classic.*$/i, '');
+    normalized = normalized.replace(/\s*-\s*MS Wrestlers at Ravens.*$/i, '');
+    
+    // Map known duplicates and variations to standard format
+    const teamMappings = {
+        // Indoor Track variations
+        'Varsity Boys Indoor Track': 'Indoor Track (Varsity Boys)',
+        'Varsity Girls Indoor Track': 'Indoor Track (Varsity Girls)',
+        
+        // Swimming variations
+        'Varsity Boys Swimming': 'Swimming (Varsity Boys)',
+        'Varsity Girls Swimming': 'Swimming (Varsity Girls)',
+        
+        // Basketball variations
+        'Varsity Boys Basketball': 'Basketball (Varsity Boys)',
+        'Varsity Girls Basketball': 'Basketball (Varsity Girls)',
+        'JV Boys Basketball': 'Basketball (JV Boys)',
+        'MS Charger Boys Basketball': 'Basketball (MS Charger Boys)',
+        'MS Gold Girls Basketball': 'Basketball (MS Gold Girls)',
+        
+        // Wrestling variations
+        'Varsity Wrestling': 'Wrestling (Varsity)',
+    };
+    
+    // Check if we have a mapping for this team (after normalization)
+    if (teamMappings[normalized]) {
+        return teamMappings[normalized];
+    }
+    
+    // If no mapping, return normalized (typos fixed, suffixes removed)
+    return normalized;
+}
+
 // Get all sports events
 app.get('/api/sports', async (req, res) => {
     try {
@@ -248,6 +295,9 @@ app.get('/api/sports', async (req, res) => {
                             console.log(`      DateGroup season fields: dateGroup.season=${dateGroup.season}, dateGroup.Season=${dateGroup.Season}`);
                         }
                         
+                        // Normalize team name to remove duplicates and fix typos
+                        const normalizedTeam = normalizeTeamName(team);
+                        
                         allEvents.push({
                             _id: doc._id.toString() + '_' + allEvents.length,
                             title: dateGroup.event || dateGroup.event_name || dateGroup.eventName || 'Untitled Event',
@@ -260,7 +310,7 @@ app.get('/api/sports', async (req, res) => {
                             venue: null,
                             author: null,
                             imageName: null,
-                            team: team,
+                            team: normalizedTeam,
                             season: season
                         });
                     } else if (dateGroup.events && Array.isArray(dateGroup.events)) {
@@ -278,6 +328,9 @@ app.get('/api/sports', async (req, res) => {
                                 console.log(`   ✅ Found season: ${eventSeason} for event: ${event.event || event.event_name || 'Untitled'}`);
                             }
                             
+                            // Normalize team name to remove duplicates and fix typos
+                            const normalizedTeam = normalizeTeamName(event.team);
+                            
                             allEvents.push({
                                 _id: doc._id.toString() + '_' + allEvents.length,
                                 title: event.event || event.event_name || event.eventName || 'Untitled Event',
@@ -290,7 +343,7 @@ app.get('/api/sports', async (req, res) => {
                                 venue: null,
                                 author: null,
                                 imageName: null,
-                                team: event.team || null,
+                                team: normalizedTeam,
                                 season: eventSeason
                             });
                         });
@@ -306,6 +359,9 @@ app.get('/api/sports', async (req, res) => {
                                   doc.season_name || event.season_name || doc.seasonName || event.seasonName ||
                                   doc.year || event.year || null;
                     
+                    // Normalize team name to remove duplicates and fix typos
+                    const normalizedTeam = normalizeTeamName(event.team);
+                    
                     allEvents.push({
                         _id: doc._id.toString() + '_events_' + index,
                         title: event.event || event.event_name || event.eventName || event.title || 'Untitled Event',
@@ -318,7 +374,7 @@ app.get('/api/sports', async (req, res) => {
                         venue: null,
                         author: null,
                         imageName: null,
-                        team: event.team || null,
+                        team: normalizedTeam,
                         season: season
                     });
                 });
@@ -328,6 +384,9 @@ app.get('/api/sports', async (req, res) => {
                 console.log(`   ✅ Found flat event structure`);
                 const location = doc.venue || doc.location || null;
                 const season = doc.season || doc.Season || doc.season_name || doc.seasonName || doc.year || null;
+                
+                // Normalize team name to remove duplicates and fix typos
+                const normalizedTeam = normalizeTeamName(doc.team);
                 
                 allEvents.push({
                     _id: doc._id.toString(),
@@ -341,7 +400,7 @@ app.get('/api/sports', async (req, res) => {
                     venue: null,
                     author: null,
                     imageName: null,
-                    team: doc.team || null,
+                    team: normalizedTeam,
                     season: season
                 });
             } else {
